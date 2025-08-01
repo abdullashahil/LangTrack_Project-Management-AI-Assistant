@@ -7,12 +7,20 @@ from dotenv import load_dotenv
 import time
 from app.mock_data import get_mock_data
 from typing import Dict, Any
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000",
+                   "https://langtrack-project-assistant.vercel.app",],  
+    allow_credentials=True,
+    allow_methods=["*"],  
+    allow_headers=["*"],  
+)
 # Load mock data
 mock_data = get_mock_data()
 

@@ -6,8 +6,8 @@ An AI-powered assistant that lets you interact with your project data using natu
 
 ## 🌐 Live Deployment
 
-- 🔗 **Frontend**: [Frontend URL Here]
-- 🔗 **Backend (API)**: [Backend URL Here]
+- 🔗 **Frontend**: [https://langtrack-project-assistant.vercel.app/]
+- 🔗 **Backend (API Docs)**: [https://langtrack-server.onrender.com/docs]
 
 ---
 
