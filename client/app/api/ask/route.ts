@@ -4,7 +4,8 @@ export async function POST(req: Request) {
   try {
     const { question } = await req.json();
     
-    const backendResponse = await fetch('https://langtrack-server.onrender.com/ask', {
+    // const backendResponse = await fetch('https://langtrack-server.onrender.com/ask', {
+    const backendResponse = await fetch('http://localhost:8000/ask', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
