@@ -102,8 +102,7 @@ export function ProjectAssistant() {
         body: JSON.stringify({ question }),
       })
       const data: AssistantResponse = await res.json()
-      console.log(data)
-
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "assistant",
