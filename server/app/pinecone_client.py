@@ -23,6 +23,7 @@ def get_index():
         print(f"Creating Pinecone index '{PINECONE_INDEX}'...")
         cloud = CloudProvider.AWS if PINECONE_CLOUD == "aws" else CloudProvider.GCP
         region = AwsRegion.US_EAST_1
+        # cosine-similarity metric from pinecone
         pc.create_index(
             name=PINECONE_INDEX,
             dimension=EMBED_DIM,
