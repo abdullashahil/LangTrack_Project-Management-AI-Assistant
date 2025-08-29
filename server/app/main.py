@@ -33,6 +33,7 @@ llm = genai.GenerativeModel("gemini-1.5-flash")
 class Query(BaseModel):
     question: str
 
+
 def generate_with_retry(prompt: str, max_retries: int = 3, delay: int = 2) -> str:
     """
     Retry wrapper for llm.generate_content
@@ -53,14 +54,14 @@ async def ask_question(query: Query):
     q_emb = embed_text(query.question, task_type="retrieval_query")
     print(q_emb)
     res = index.query(vector=q_emb, top_k=6, include_metadata=True)
-    print(res)
+    # print(res)
     contexts = [match["metadata"]["text"] for match in res.matches]
-    print(contexts)
+    # print(contexts)
     prompt = build_prompt(query.question, contexts)
     
     # Use retry mechanism
     answer = generate_with_retry(prompt)
-    
+
     return {
         "success": True,
         "data": {
