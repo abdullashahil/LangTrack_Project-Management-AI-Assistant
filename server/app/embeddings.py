@@ -1,45 +1,88 @@
 # server/app/embeddings.py
 import os
-from typing import List, Optional
+from dotenv import load_dotenv
+import google.generativeai as genai  # keep your existing import
+import logging
 
-# use google-genai client
-from google import genai
-from google.genai import types
+load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
 EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-004")
 
-_client: Optional[genai.Client] = None
+genai.configure(api_key=GOOGLE_API_KEY)
+logger = logging.getLogger(__name__)
 
-def _get_client() -> genai.Client:
-    global _client
-    if _client is None:
-        # lazy init so import doesn't block startup
-        _client = genai.Client(api_key=GOOGLE_API_KEY)
-    return _client
 
-def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> List[float]:
+def _extract_embedding(resp):
     """
-    Returns embedding vector as plain Python list.
+    Try several common response shapes and return the vector/list of floats.
     """
-    client = _get_client()
-    # use a list of contents so response is consistent
-    resp = client.models.embed_content(
-        model=EMBEDDING_MODEL,
-        contents=[text],
-        config=types.EmbedContentConfig(
-            output_dimensionality=EMBED_DIM,
+    if resp is None:
+        raise ValueError("embed response is None")
+
+    # common (your original): {"embedding": [...]}
+    if isinstance(resp, dict) and "embedding" in resp:
+        return resp["embedding"]
+
+    # other common shapes:
+    # {"embeddings": [{"embedding": [...]}]} or {"embeddings": [{"vector": [...]}, ...]}
+    if isinstance(resp, dict) and "embeddings" in resp:
+        embs = resp["embeddings"]
+        if embs and isinstance(embs, list):
+            first = embs[0]
+            if isinstance(first, dict):
+                for key in ("embedding", "vector", "value"):
+                    if key in first:
+                        return first[key]
+                # some libs place vector under "embedding" -> "embedding"
+                if "embedding" in first and isinstance(first["embedding"], dict) and "value" in first["embedding"]:
+                    return first["embedding"]["value"]
+
+    # google.genai (newer client) sometimes returns an object with attribute .embedding or .embeddings
+    try:
+        # handle objects with attributes
+        if hasattr(resp, "embedding"):
+            return resp.embedding
+        if hasattr(resp, "embeddings"):
+            embs = resp.embeddings
+            if embs and hasattr(embs[0], "embedding"):
+                return embs[0].embedding
+    except Exception:
+        pass
+
+    # if nothing matched, raise with debug info
+    raise ValueError(f"Unknown embed response shape: {type(resp)}; repr: {repr(resp)[:1024]}")
+
+
+def embed_text(text: str, task_type: str = "retrieval_document"):
+    """
+    Call genai embed API in a way that works across SDK versions:
+     - first try the call including output_dimensionality (older code)
+     - if that fails due to API signature, call without it
+    Returns: list[float] embedding vector
+    """
+    try:
+        # Try original call (works with some sdks)
+        resp = genai.embed_content(
+            model=EMBEDDING_MODEL,
+            content=text,
             task_type=task_type,
-        ),
-    )
-    # resp.embeddings[0] may have .values or .embedding depending on SDK - prefer .values
-    emb_obj = resp.embeddings[0]
-    vector = getattr(emb_obj, "values", None) or getattr(emb_obj, "embedding", None)
-    if vector is None:
-        # fallback: try the raw dict path if SDK returns mapping
-        try:
-            return resp["embeddings"][0]["values"]
-        except Exception:
-            raise RuntimeError("Unexpected embedding response shape: %r" % (resp,))
-    return list(vector)
+            output_dimensionality=EMBED_DIM,
+        )
+    except TypeError as e:
+        # SDK doesn't accept output_dimensionality: retry without it
+        logger.info("embed_content() doesn't accept output_dimensionality; retrying without that arg.")
+        resp = genai.embed_content(
+            model=EMBEDDING_MODEL,
+            content=text,
+            task_type=task_type,
+        )
+    except Exception as e:
+        # other errors: re-raise after logging
+        logger.exception("Unexpected error calling embed_content")
+        raise
+
+    # extract vector from response
+    emb = _extract_embedding(resp)
+    return emb
