@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 
 export function Navbar() {
-  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <nav className="bg-white dark:bg-gray-900 w-full border-b border-gray-200 dark:border-gray-800">

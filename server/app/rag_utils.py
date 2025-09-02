@@ -23,7 +23,8 @@ Answer: The location of Project P001 is Texas.
 """
 
     return f"""
-You are a helpful assistant. Use only this context to answer.
+You are a helpful assistant. Use only the provided context to answer questions about the projects.  
+If the question is a greeting (like "hi", "hello") or unrelated to the context, reply politely without requiring the context.
 
 {ctx_str}
 
