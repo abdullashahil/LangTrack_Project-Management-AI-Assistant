@@ -1,30 +1,45 @@
-# embeddings.py (google-genai)
+# server/app/embeddings.py
 import os
-from dotenv import load_dotenv
+from typing import List, Optional
+
+# use google-genai client
 from google import genai
 from google.genai import types
 
-load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))
-# recommended embeddings: "gemini-embedding-001" or "text-embedding-005" etc.
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
+EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))
 
-# create client (the SDK reads API key env var, or pass it explicitly)
-client = genai.Client(api_key=GOOGLE_API_KEY)
+_client: Optional[genai.Client] = None
 
-def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT"):
+def _get_client() -> genai.Client:
+    global _client
+    if _client is None:
+        # lazy init so import doesn't block startup
+        _client = genai.Client(api_key=GOOGLE_API_KEY)
+    return _client
+
+def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> List[float]:
+    """
+    Returns embedding vector as plain Python list.
+    """
+    client = _get_client()
+    # use a list of contents so response is consistent
     resp = client.models.embed_content(
         model=EMBEDDING_MODEL,
-        # contents can be a single string or list of strings
         contents=[text],
-        # put the dimensionality & task type in the config object
         config=types.EmbedContentConfig(
             output_dimensionality=EMBED_DIM,
             task_type=task_type,
         ),
     )
-    # response has `embeddings` list; each embedding object usually exposes `.values`
-    embedding_obj = resp.embeddings[0]
-    vector = getattr(embedding_obj, "values", None) or getattr(embedding_obj, "embedding", None)
-    return vector
+    # resp.embeddings[0] may have .values or .embedding depending on SDK - prefer .values
+    emb_obj = resp.embeddings[0]
+    vector = getattr(emb_obj, "values", None) or getattr(emb_obj, "embedding", None)
+    if vector is None:
+        # fallback: try the raw dict path if SDK returns mapping
+        try:
+            return resp["embeddings"][0]["values"]
+        except Exception:
+            raise RuntimeError("Unexpected embedding response shape: %r" % (resp,))
+    return list(vector)
