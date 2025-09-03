@@ -1,17 +1,23 @@
 # server/app/embeddings.py
 import os
 from dotenv import load_dotenv
-import google.generativeai as genai  # keep your existing import
+import google.generativeai as genai
 import logging
 
 load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))
+# keep backwards compatible default but normalize it below
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-004")
+
+# Normalize model name to the required format: must start with "models/" or "tunedModels/"
+if not (EMBEDDING_MODEL.startswith("models/") or EMBEDDING_MODEL.startswith("tunedModels/")):
+    EMBEDDING_MODEL = f"models/{EMBEDDING_MODEL}"
 
 genai.configure(api_key=GOOGLE_API_KEY)
 logger = logging.getLogger(__name__)
+
 
 
 def _extract_embedding(resp):
