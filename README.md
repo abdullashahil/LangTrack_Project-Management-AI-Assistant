@@ -44,7 +44,7 @@ This project integrates **modern AI, vector search, and backend technologies**:
 
 * **FastAPI** → High-performance Python backend for API endpoints.
 * **Google Gemini (Generative AI API)** → Powers natural language understanding and response generation.
-* **Embeddings (`text-embedding-004`)** → Converts text into dense vectors for semantic search.
+* **Embeddings (`text-embedding-001`)** → Converts text into dense vectors for semantic search.
 * **Pinecone Vector Database** → Stores and retrieves embeddings efficiently.
 * **Cosine Similarity** → Used as the metric to find the most relevant project data.
 * **Dynamic Prompting** → Prompts are built on the fly using retrieved context.
