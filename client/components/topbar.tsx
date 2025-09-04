@@ -1,13 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, Database } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 
 export function Topbar() {
   return (
     <header className="sticky top-0 z-20 w-full border-b border-white/10 bg-white/60 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:bg-black/30">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+        
+        {/* Logo and Brand */}
         <Link href="/" className="flex items-center gap-2" aria-label="Go to home">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-black">
             <MessageCircle className="h-5 w-5" aria-hidden="true" />
@@ -15,7 +17,19 @@ export function Topbar() {
           <span className="font-semibold tracking-tight text-foreground">LangTrack</span>
         </Link>
 
-        <div className="flex items-center gap-2">
+        {/* Right-side controls */}
+        <div className="flex items-center gap-3">
+          {/* Dataset link */}
+          <Link 
+            href="https://huggingface.co/datasets/JohnVans123/ProjectManagement/viewer?row=0&views%5B%5D=train" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-sm font-medium text-foreground/80 hover:text-emerald-500 transition"
+          >
+            <Database className="h-4 w-4" />
+            Dataset
+          </Link>
+
           <ThemeToggle />
         </div>
       </div>
