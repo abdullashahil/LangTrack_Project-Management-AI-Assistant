@@ -24,6 +24,7 @@ genai.configure(api_key=GOOGLE_API_KEY)
 def embed_texts(texts, task_type: str = "retrieval_document"):
     """
     Batch embedding for a list of texts, with safe fallback if Gemini refuses output_dimensionality.
+    Handles multiple response formats ('embeddings', 'embedding', 'values').
     """
     resp = None
     embeddings = []
@@ -41,7 +42,7 @@ def embed_texts(texts, task_type: str = "retrieval_document"):
     except Exception as e:
         logger.error(f"embed_content() failed with dimension={EMBED_DIM}: {e}")
 
-    # --- If no response or embeddings, retry without dimensionality ---
+    # --- If no response, retry without dimensionality ---
     if not resp:
         try:
             resp = genai.embed_content(
@@ -54,18 +55,26 @@ def embed_texts(texts, task_type: str = "retrieval_document"):
             logger.error(f"embed_content() failed completely: {e}")
             return []
 
-    # --- Parse response consistently ---
+    # --- Normalize response ---
     if hasattr(resp, "embeddings"):
-        embeddings = [emb.embedding for emb in resp.embeddings]
-    elif isinstance(resp, dict) and "embeddings" in resp:
-        embeddings = [e.get("embedding") or e.get("values") for e in resp["embeddings"]]
+        # SDK object
+        embeddings = [getattr(e, "embedding", None) or getattr(e, "values", None) for e in resp.embeddings]
+    elif isinstance(resp, dict):
+        if "embeddings" in resp:
+            embeddings = [e.get("embedding") or e.get("values") for e in resp["embeddings"]]
+        elif "embedding" in resp:
+            # Single embedding case
+            emb = resp.get("embedding") or resp.get("values")
+            embeddings = [emb] if emb else []
 
-    if not embeddings:
+    # --- Final check ---
+    if not embeddings or not embeddings[0]:
         logger.error(f"[EmbedTexts] No embeddings returned. raw response={resp}")
         return []
 
     logger.info(f"[EmbedTexts] model={EMBEDDING_MODEL}, batch={len(texts)}, dim={len(embeddings[0])}")
     return embeddings
+
 
 
 def embed_text(text: str, task_type: str = "retrieval_document"):
