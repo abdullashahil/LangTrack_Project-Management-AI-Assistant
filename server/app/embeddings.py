@@ -4,8 +4,12 @@ from dotenv import load_dotenv
 import logging
 import google.generativeai as genai
 
+# Load environment variables
 load_dotenv()
-logger = logging.getLogger(__name__)
+
+# Configure logger
+logger = logging.getLogger("uvicorn")  # integrates with Render logs
+logger.setLevel(logging.INFO)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))
@@ -13,7 +17,7 @@ EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))
 # Prefer explicit full model id set in the environment; fall back to a known-good default
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-001")
 
-# ensure model string at least begins correctly (defensive)
+# Ensure model string at least begins correctly (defensive)
 if not (EMBEDDING_MODEL.startswith("models/") or EMBEDDING_MODEL.startswith("tunedModels/")):
     EMBEDDING_MODEL = f"models/{EMBEDDING_MODEL}"
 
@@ -59,7 +63,6 @@ def embed_text(text: str, task_type: str = "retrieval_document"):
     last_exc = None
     model = EMBEDDING_MODEL
 
-    # Try calling with output_dimensionality first (for older SDK shapes)
     try:
         resp = genai.embed_content(
             model=model,
@@ -67,9 +70,8 @@ def embed_text(text: str, task_type: str = "retrieval_document"):
             task_type=task_type,
             output_dimensionality=EMBED_DIM,
         )
-    except TypeError as e:
-        # the client doesn't accept output_dimensionality -> retry without it
-        logger.info("embed_content() doesn't accept output_dimensionality; retrying without it.")
+    except TypeError:
+        logger.warning("embed_content() doesn't accept output_dimensionality; retrying without it.")
         try:
             resp = genai.embed_content(
                 model=model,
@@ -77,16 +79,17 @@ def embed_text(text: str, task_type: str = "retrieval_document"):
                 task_type=task_type,
             )
         except Exception as e2:
-            last_exc = e2
             logger.exception("Failed to get embedding without output_dimensionality")
             raise RuntimeError(f"Failed to get embedding (model={model}): {e2}") from e2
     except Exception as e:
-        last_exc = e
         logger.exception("Failed to get embedding with output_dimensionality")
         raise RuntimeError(f"Failed to get embedding (model={model}): {e}") from e
 
     emb = _extract_embedding(resp)
+    logger.info(f"[EmbedText] model={model}, dim={len(emb)}, preview={emb[:6]}")
     return emb
 
-print(f"[Startup] EMBEDDING_MODEL in use: {EMBEDDING_MODEL}")
-print(f"[Startup] EMBED_DIM in use: {EMBED_DIM}")
+
+# Log startup configuration
+logger.info(f"[Startup] EMBEDDING_MODEL in use: {EMBEDDING_MODEL}")
+logger.info(f"[Startup] EMBED_DIM in use: {EMBED_DIM}")
