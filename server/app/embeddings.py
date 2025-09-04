@@ -87,3 +87,6 @@ def embed_text(text: str, task_type: str = "retrieval_document"):
 
     emb = _extract_embedding(resp)
     return emb
+
+print(f"[Startup] EMBEDDING_MODEL in use: {EMBEDDING_MODEL}")
+print(f"[Startup] EMBED_DIM in use: {EMBED_DIM}")
