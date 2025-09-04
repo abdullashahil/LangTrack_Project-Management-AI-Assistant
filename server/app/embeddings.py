@@ -1,13 +1,13 @@
 # server/app/embeddings.py
 import os
-import time
-import logging
 from dotenv import load_dotenv
+import logging
 import google.generativeai as genai
 
-# Load env
+# Load environment variables
 load_dotenv()
 
+# Configure logger
 logger = logging.getLogger("uvicorn")
 logger.setLevel(logging.INFO)
 
@@ -21,47 +21,56 @@ if not (EMBEDDING_MODEL.startswith("models/") or EMBEDDING_MODEL.startswith("tun
 genai.configure(api_key=GOOGLE_API_KEY)
 
 
-def embed_text(text: str, task_type: str = "retrieval_document", retries: int = 3, backoff: int = 10):
+def embed_texts(texts, task_type: str = "retrieval_document"):
     """
-    Embed a single text with retry logic.
+    Batch embedding for a list of texts, with safe fallback if Gemini refuses output_dimensionality.
     """
-    for attempt in range(retries):
+    resp = None
+    embeddings = []
+
+    # --- First try with explicit dimensionality ---
+    try:
+        resp = genai.embed_content(
+            model=EMBEDDING_MODEL,
+            content=texts,
+            task_type=task_type,
+            output_dimensionality=EMBED_DIM,
+        )
+    except TypeError:
+        logger.warning("embed_content() raised TypeError with output_dimensionality, retrying without it.")
+    except Exception as e:
+        logger.error(f"embed_content() failed with dimension={EMBED_DIM}: {e}")
+
+    # --- If no response or embeddings, retry without dimensionality ---
+    if not resp:
         try:
             resp = genai.embed_content(
                 model=EMBEDDING_MODEL,
-                content=text,
+                content=texts,
                 task_type=task_type,
-                output_dimensionality=EMBED_DIM,
             )
-            # Handle response variations
-            if hasattr(resp, "embedding"):
-                return resp.embedding
-            if isinstance(resp, dict) and "embedding" in resp:
-                return resp["embedding"]
-            logger.warning(f"[EmbedText] Unexpected response: {resp}")
-            return None
+            logger.warning("Fallback: embed_content() without output_dimensionality worked.")
         except Exception as e:
-            if "429" in str(e):
-                wait_time = backoff * (2 ** attempt)  # exponential backoff
-                logger.warning(f"⚠️ Quota exceeded (429). Retrying in {wait_time}s...")
-                time.sleep(wait_time)
-            else:
-                logger.error(f"❌ Embedding error: {e}")
-                return None
-    logger.error("❌ Max retries reached. Returning None.")
-    return None
+            logger.error(f"embed_content() failed completely: {e}")
+            return []
 
+    # --- Parse response consistently ---
+    if hasattr(resp, "embeddings"):
+        embeddings = [emb.embedding for emb in resp.embeddings]
+    elif isinstance(resp, dict) and "embeddings" in resp:
+        embeddings = [e.get("embedding") or e.get("values") for e in resp["embeddings"]]
 
-def embed_texts(texts, task_type: str = "retrieval_document"):
-    """
-    Safe wrapper: embeds texts one by one (slower, but avoids Gemini API batch issues).
-    """
-    embeddings = []
-    for i, t in enumerate(texts):
-        emb = embed_text(t, task_type=task_type)
-        if emb:
-            embeddings.append(emb)
-        else:
-            logger.warning(f"⚠️ Skipping text {i}, no embedding returned.")
-    logger.info(f"[EmbedTexts] model={EMBEDDING_MODEL}, count={len(embeddings)}, dim={len(embeddings[0]) if embeddings else '??'}")
+    if not embeddings:
+        logger.error(f"[EmbedTexts] No embeddings returned. raw response={resp}")
+        return []
+
+    logger.info(f"[EmbedTexts] model={EMBEDDING_MODEL}, batch={len(texts)}, dim={len(embeddings[0])}")
     return embeddings
+
+
+def embed_text(text: str, task_type: str = "retrieval_document"):
+    """Single text fallback (for convenience)."""
+    embs = embed_texts([text], task_type=task_type)
+    if not embs:
+        return None
+    return embs[0]

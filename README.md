@@ -101,7 +101,7 @@ Create a `.env` file in the `app/` directory with the following:
 GOOGLE_API_KEY=your_api_key_here
 PINECONE_API_KEY=your_pinecone_key
 PINECONE_INDEX=your_index_name
-EMBED_DIM=768
+EMBED_DIM=3072
 ```
 
 ### 4. Run the Server
